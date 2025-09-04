@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 
 // https://vite.dev/config/
 export default defineConfig({
+	base: '/qrcodegen/',
 	plugins: [vue(), tailwindcss()],
 	optimizeDeps: {
 		force: true,
