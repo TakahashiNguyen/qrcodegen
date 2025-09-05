@@ -4,7 +4,9 @@
 			<h1 class="text-9xl">404!</h1>
 			<div class="flex flex-col">
 				<a>Trang này chưa tồn tại hoặc có thể đã bị xóa.</a>
-				<router-link class="link w-fit font-sans" to="/">Về trang chủ</router-link>
+				<router-link class="link w-fit font-sans" to="/"
+					>Về trang chủ</router-link
+				>
 			</div>
 		</div>
 	</div>

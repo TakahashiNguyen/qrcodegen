@@ -1,8 +1,5 @@
 <template>
-	<FormContainerComp
-		:button-handler="handleButton"
-		title="Tạo QR lưu danh bạ"
-	>
+	<FormContainerComp :button-handler="handleButton" title="Tạo QR lưu danh bạ">
 		<Carousel
 			indicators-location="-bottom-15 p-1 hidden"
 			:indicator="{
