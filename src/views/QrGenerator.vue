@@ -1,26 +1,59 @@
 <template>
 	<FormContainerComp
 		:button-handler="handleButton"
-		title="Tạo QR lưu thông tin danh bạ"
+		title="Tạo QR lưu danh bạ"
 	>
-		<FormTextInputComp name="Tên cá nhân" v-model="input.name" />
-		<FormTextInputComp name="Số điện thoại" v-model="input.phone" />
-		<FormTextInputComp name="Thư điện tử" v-model="input.email" />
-		<Button type="submit">Continue</Button>
-		<div v-if="qrDataUrl">
-			<img :src="qrDataUrl" alt="vCard QR Code" />
-		</div>
+		<Carousel
+			indicators-location="-bottom-15 p-1 hidden"
+			:indicator="{
+				activeClasses: 'bg-light-primary/90',
+				inactiveClasses: 'bg-light-primary/50 hover:bg-light-primary/70',
+			}"
+			class="mb-20 min-h-30"
+		>
+			<template #buttons="{ next, isEnd, previous, isStart }">
+				<div
+					class="right-0 -bottom-15 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
+				>
+					<Button
+						:button-ref="previous"
+						theme="secondary"
+						:class="{ hidden: isStart }"
+					>
+						Trở về
+					</Button>
+					<Button
+						:button-ref="next"
+						:class="{ hidden: isEnd }"
+						:onclick="handleButton"
+					>
+						Hoàn tất
+					</Button>
+				</div>
+			</template>
+			<template #content>
+				<div class="w-full space-y-6">
+					<FormTextInputComp name="Tên cá nhân" v-model="input.name" />
+					<FormTextInputComp name="Số điện thoại" v-model="input.phone" />
+					<FormTextInputComp name="Thư điện tử" v-model="input.email" />
+				</div>
+				<div class="w-full justify-center px-16">
+					<img :src="qrContact" alt="" />
+				</div>
+			</template>
+		</Carousel>
 	</FormContainerComp>
 </template>
 
 <script setup lang="ts">
 import Button from '@/components/Button.vue';
+import Carousel from '@/components/Carousel.vue';
 import FormContainerComp from '@/components/FormContainer.vue';
 import FormTextInputComp from '@/components/TextInput.vue';
 import QRCode from 'qrcode';
 import { reactive, ref } from 'vue';
 
-const qrDataUrl = ref(''),
+const qrContact = ref(''),
 	input = reactive({
 		name: '',
 		email: '',
@@ -35,7 +68,8 @@ const qrDataUrl = ref(''),
 				nField = [lastName, firstName, middleName, '', ''].join(';'),
 				fnField = `${lastName} ${middleName} ${firstName}`.trim();
 
-			return `
+			return {
+				qrContact: `
 BEGIN:VCARD
 VERSION:3.0
 N:${nField}
@@ -43,9 +77,13 @@ FN:${fnField}
 TEL;TYPE=cell:${phone}
 EMAIL;INTERNET;PREF:${email}
 END:VCARD
-  `.trim();
+  `.trim(),
+				qrPhone: `MECARD:TEL:${phone};;`,
+			};
 		}
 
-		qrDataUrl.value = await QRCode.toDataURL(generateVCard());
+		const { qrContact: qrC } = generateVCard(),
+			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 0, width: 512 };
+		qrContact.value = await QRCode.toDataURL(qrC, qrOptions);
 	};
 </script>
