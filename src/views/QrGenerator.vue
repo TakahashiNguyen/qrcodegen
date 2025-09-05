@@ -30,9 +30,9 @@
 			</template>
 			<template #content>
 				<div class="w-full space-y-6">
-					<FormTextInputComp name="Tên cá nhân" v-model="input.name" />
+					<FormTextInputComp name="Họ và tên" v-model="input.name" />
 					<FormTextInputComp name="Số điện thoại" v-model="input.phone" />
-					<FormTextInputComp name="Thư điện tử" v-model="input.email" />
+					<FormTextInputComp name="Địa chỉ thư điện tử" v-model="input.email" />
 				</div>
 				<div class="w-full justify-center px-16">
 					<img :src="qrContact" alt="" />
@@ -59,9 +59,9 @@ const qrContact = ref(''),
 	handleButton = async () => {
 		function generateVCard() {
 			const { name, phone, email } = input,
-				lastName = name.split(' ')[0],
-				firstName = name.split(' ').slice(-1)[0],
-				middleName = name.split(' ').slice(1, -1).join(' ') || '',
+				lastName = name,
+				firstName = '',
+				middleName = '',
 				nField = [lastName, firstName, middleName, '', ''].join(';'),
 				fnField = `${lastName} ${middleName} ${firstName}`.trim();
 
