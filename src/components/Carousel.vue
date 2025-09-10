@@ -110,6 +110,7 @@ const carouselElement = ref<HTMLElement>(),
 	carouselIndicatorsWrapper = ref<HTMLElement>(),
 	carouselNext = ref<Element>(),
 	carouselPrevious = ref<Element>(),
+	carousel = ref<CarouselInterface>(),
 	next = getSlotRefSet(carouselNext),
 	previous = getSlotRefSet(carouselPrevious),
 	loadingDiv = ref<InstanceType<typeof LoadingDiv>>(),
@@ -201,23 +202,30 @@ onMounted(async () => {
 
 	await waitForPageLoad();
 
-	const carousel: CarouselInterface = new CustomCarousel(
+	carousel.value = new CustomCarousel(
 		carouselElement.value,
 		items,
 		options,
 		{},
 	);
 
-	if (props.isCycle) carousel.cycle();
+	if (props.isCycle) carousel.value.cycle();
 
 	carouselPrevious.value?.addEventListener('click', () => {
-		if (!isStart.value || props.overflowing || props.isCycle) carousel.prev();
+		if (!isStart.value || props.overflowing || props.isCycle)
+			carousel.value?.prev();
 	});
 
 	carouselNext.value?.addEventListener('click', () => {
-		if (!isEnd.value || props.overflowing || props.isCycle) carousel.next();
+		if (!isEnd.value || props.overflowing || props.isCycle)
+			carousel.value?.next();
 	});
 
 	loadingDiv.value?.toggleHidden();
+});
+
+defineExpose({
+	next: () => carousel.value?.next(),
+	previous: () => carousel.value?.prev(),
 });
 </script>

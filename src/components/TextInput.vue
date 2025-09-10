@@ -20,6 +20,7 @@
 				:type="type"
 				:disabled="disable"
 				:placeholder="placeholder"
+				v-bind="inputAttr"
 			/>
 		</div>
 	</div>
@@ -27,21 +28,24 @@
 
 <script setup lang="ts">
 import IconComp from '@/components/Icon.vue';
-import type { PropType } from 'vue';
+import { type PropType, computed } from 'vue';
 
-const model = defineModel();
-
-defineProps({
-	name: {
-		type: String,
-		required: true,
-	},
-	type: {
-		type: String as PropType<HTMLInputElement['type']>,
-		default: 'text',
-	},
-	icon: { type: String, required: false },
-	placeholder: { type: String, required: false },
-	disable: { type: Boolean, required: false },
-});
+const model = defineModel(),
+	props = defineProps({
+		name: {
+			type: String,
+			required: true,
+		},
+		type: {
+			type: String as PropType<HTMLInputElement['type']>,
+			default: 'text',
+		},
+		icon: { type: String, required: false },
+		placeholder: { type: String, required: false },
+		disable: { type: Boolean, required: false },
+		accept: { type: String, default: '' },
+	}),
+	inputAttr = computed(() => {
+		return { accept: props.accept || undefined };
+	});
 </script>

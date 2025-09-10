@@ -16,6 +16,7 @@
 		"@vueuse/core": "^13.9.0",
 		"flowbite": "^3.1.2",
 		"material-symbols": "^0.35.0",
+		"qr-scanner": "^1.4.2",
 		"qrcode": "^1.5.4",
 		"tailwindcss": "^4.1.12",
 		"vue": "^3.5.18",

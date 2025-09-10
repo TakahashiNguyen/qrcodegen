@@ -7,8 +7,9 @@
 				inactiveClasses: 'bg-light-primary/50 hover:bg-light-primary/70',
 			}"
 			class="mb-20 min-h-30"
+			ref="carousel"
 		>
-			<template #buttons="{ next, isEnd, previous, isStart }">
+			<template #buttons="{ isEnd, previous, isStart }">
 				<div
 					class="right-0 -bottom-15 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
 				>
@@ -19,11 +20,7 @@
 					>
 						Trở về
 					</Button>
-					<Button
-						:button-ref="next"
-						:class="{ hidden: isEnd }"
-						:onclick="handleButton"
-					>
+					<Button :class="{ hidden: isEnd }" :onclick="handleButton">
 						Hoàn tất
 					</Button>
 					<Button :class="{ hidden: isStart }" :onclick="qrDownload">
@@ -38,9 +35,22 @@
 					<FormTextInputComp name="Địa chỉ thư điện tử" v-model="input.email" />
 					<FormTextInputComp name="Số phòng" v-model="input.address" />
 					<FormTextInputComp name="Link url fanpage" v-model="input.url" />
+					<FormTextInputComp
+						type="file"
+						@change="handleFileChange"
+						accept="image/*"
+						name="Ảnh logo"
+					/>
+					<FormTextInputComp
+						name="Tỉ lệ logo so với gốc"
+						v-model="input.logoRatio"
+					/>
+					<div v-if="error">
+						<a class="text-error">{{ error }}</a>
+					</div>
 				</div>
-				<div class="w-full justify-center px-16">
-					<img :src="qrContact" alt="" />
+				<div class="aspect-square w-full">
+					<canvas ref="qrCode" class="!size-full" />
 				</div>
 			</template>
 		</Carousel>
@@ -48,52 +58,45 @@
 </template>
 
 <script setup lang="ts">
+import { sleep } from '@/app/functions';
 import Button from '@/components/Button.vue';
 import Carousel from '@/components/Carousel.vue';
 import FormContainerComp from '@/components/FormContainer.vue';
 import FormTextInputComp from '@/components/TextInput.vue';
+import QrScanner from 'qr-scanner';
 import QRCode from 'qrcode';
 import { reactive, ref } from 'vue';
 
-const qrContact = ref(''),
+const qrCode = ref<HTMLCanvasElement>(),
 	input = reactive({
 		name: '',
 		email: '',
 		phone: '',
 		address: '',
 		url: '',
+		logoRatio: 1,
 	}),
+	logoReader = new FileReader(),
+	logoDraw = ref<Function>(),
+	carousel = ref<typeof Carousel>(),
+	error = ref(''),
 	qrDownload = async () => {
-		const img = new Image();
-		img.crossOrigin = 'Anonymous'; // Important for cross-origin safety
+		qrCode.value!.toBlob((blob) => {
+			if (!blob) return;
 
-		img.onload = () => {
-			const canvas = document.createElement('canvas'),
-				ctx = canvas.getContext('2d');
-
-			canvas.width = img.width;
-			canvas.height = img.height;
-
-			if (!ctx) return;
-			ctx.drawImage(img, 0, 0);
-
-			canvas.toBlob((blob) => {
-				if (!blob) return;
-
-				const url = URL.createObjectURL(blob),
-					a = document.createElement('a');
-				a.href = url;
-				a.download = input.name + '.png';
-				document.body.appendChild(a);
-				a.click();
-				document.body.removeChild(a);
-				URL.revokeObjectURL(url);
-			}, 'image/png');
-		};
-
-		img.src = qrContact.value;
+			const url = URL.createObjectURL(blob),
+				a = document.createElement('a');
+			a.href = url;
+			a.download = input.name + '.png';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}, 'image/png');
 	},
 	handleButton = async () => {
+		error.value = '';
+
 		function generateVCard() {
 			const { name, phone, email, address, url } = input,
 				lastName = name,
@@ -110,7 +113,7 @@ N:${nField}
 FN:${fnField}
 TEL;TYPE=cell:${phone}
 EMAIL;INTERNET;PREF:${email}
-ADR;TYPE=WORK;PREF=1;LABEL="":;Phòng ${address};Trường Đại học Tôn Đức Thắng;;;;
+ADR;TYPE=WORK;PREF=1;LABEL="":;Trường Đại học Tôn Đức Thắng;Phòng ${address};phường Tân Phong;19 Nguyễn Hữu Thọ;Thành phố Hồ Chí Minh;Việt Nam
 URL:${url}
 END:VCARD
   `.trim(),
@@ -118,8 +121,58 @@ END:VCARD
 			};
 		}
 
-		const { qrContact: qrC } = generateVCard(),
-			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 5, width: 512 };
-		qrContact.value = await QRCode.toDataURL(qrC, qrOptions);
+		const { qrContact: value } = generateVCard(),
+			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 5, width: 4096 };
+
+		QRCode.toCanvas(qrCode.value, value, qrOptions);
+
+		logoDraw.value?.();
+
+		await sleep(10);
+
+		try {
+			const decoded = await QrScanner.scanImage(qrCode.value!);
+
+			if (decoded !== value) throw new Error();
+
+			carousel.value?.next();
+		} catch {
+			error.value = 'Logo quá lớn, không thể nhận dạng.';
+		}
 	};
+
+logoReader.onload = (e) => {
+	const img = new Image();
+
+	img.onload = () => {
+		if (qrCode.value) {
+			const ctx = qrCode.value.getContext('2d'),
+				ele = qrCode.value,
+				imgWidth = img.width * input.logoRatio,
+				imgHeight = img.height * input.logoRatio;
+
+			if (ctx) {
+				ctx.drawImage(
+					img,
+					(ele.width - imgWidth) / 2,
+					(ele.height - imgHeight) / 2,
+					imgWidth,
+					imgHeight,
+				);
+			}
+		}
+	};
+
+	img.src = e.target?.result as string;
+};
+
+function handleFileChange(event: Event) {
+	const input = event.target as HTMLInputElement;
+
+	if (input.files && input.files[0]) {
+		const file = input.files[0];
+
+		logoDraw.value = () => logoReader.readAsDataURL(file);
+	}
+}
 </script>
