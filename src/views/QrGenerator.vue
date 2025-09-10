@@ -26,6 +26,9 @@
 					>
 						Hoàn tất
 					</Button>
+					<Button :class="{ hidden: isStart }" :onclick="qrDownload">
+						Tải ảnh
+					</Button>
 				</div>
 			</template>
 			<template #content>
@@ -33,6 +36,8 @@
 					<FormTextInputComp name="Họ và tên" v-model="input.name" />
 					<FormTextInputComp name="Số điện thoại" v-model="input.phone" />
 					<FormTextInputComp name="Địa chỉ thư điện tử" v-model="input.email" />
+					<FormTextInputComp name="Số phòng" v-model="input.address" />
+					<FormTextInputComp name="Link url fanpage" v-model="input.url" />
 				</div>
 				<div class="w-full justify-center px-16">
 					<img :src="qrContact" alt="" />
@@ -55,10 +60,42 @@ const qrContact = ref(''),
 		name: '',
 		email: '',
 		phone: '',
+		address: '',
+		url: '',
 	}),
+	qrDownload = async () => {
+		const img = new Image();
+		img.crossOrigin = 'Anonymous'; // Important for cross-origin safety
+
+		img.onload = () => {
+			const canvas = document.createElement('canvas'),
+				ctx = canvas.getContext('2d');
+
+			canvas.width = img.width;
+			canvas.height = img.height;
+
+			if (!ctx) return;
+			ctx.drawImage(img, 0, 0);
+
+			canvas.toBlob((blob) => {
+				if (!blob) return;
+
+				const url = URL.createObjectURL(blob),
+					a = document.createElement('a');
+				a.href = url;
+				a.download = input.name + '.png';
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			}, 'image/png');
+		};
+
+		img.src = qrContact.value;
+	},
 	handleButton = async () => {
 		function generateVCard() {
-			const { name, phone, email } = input,
+			const { name, phone, email, address, url } = input,
 				lastName = name,
 				firstName = '',
 				middleName = '',
@@ -73,6 +110,8 @@ N:${nField}
 FN:${fnField}
 TEL;TYPE=cell:${phone}
 EMAIL;INTERNET;PREF:${email}
+ADR;TYPE=WORK;PREF=1;LABEL="":;Phòng ${address};Trường Đại học Tôn Đức Thắng;;;;
+URL:${url}
 END:VCARD
   `.trim(),
 				qrPhone: `MECARD:TEL:${phone};;`,
@@ -80,7 +119,7 @@ END:VCARD
 		}
 
 		const { qrContact: qrC } = generateVCard(),
-			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 0, width: 512 };
+			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 5, width: 512 };
 		qrContact.value = await QRCode.toDataURL(qrC, qrOptions);
 	};
 </script>
