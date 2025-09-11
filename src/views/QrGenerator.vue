@@ -30,21 +30,19 @@
 			</template>
 			<template #content>
 				<div class="w-full space-y-6">
-					<FormTextInputComp name="Họ và tên" v-model="input.name" />
-					<FormTextInputComp name="Số điện thoại" v-model="input.phone" />
-					<FormTextInputComp name="Địa chỉ thư điện tử" v-model="input.email" />
-					<FormTextInputComp name="Số phòng" v-model="input.address" />
-					<FormTextInputComp name="Link url fanpage" v-model="input.url" />
-					<FormTextInputComp
+					<TextInput name="Họ và tên" v-model="input.name" />
+					<TextInput name="Số điện thoại" v-model="input.phone" />
+					<TextInput name="Địa chỉ thư điện tử" v-model="input.email" />
+					<TextInput name="Số phòng" v-model="input.address" />
+					<TextInput name="Link url fanpage" v-model="input.url" />
+					<SelectInput name="Cấp độ (càng cao càng chi tiết; mặc định: thấp)" :list="qrLevel" v-model="input.errorLevel" />
+					<TextInput
 						type="file"
 						@change="handleFileChange"
 						accept="image/*"
 						name="Ảnh logo"
 					/>
-					<FormTextInputComp
-						name="Tỉ lệ logo so với gốc"
-						v-model="input.logoRatio"
-					/>
+					<TextInput v-if="logoDraw" name="Tỉ lệ logo so với gốc" v-model="input.logoRatio" />
 					<div v-if="error">
 						<a class="text-error">{{ error }}</a>
 					</div>
@@ -62,19 +60,30 @@ import { sleep } from '@/app/functions';
 import Button from '@/components/Button.vue';
 import Carousel from '@/components/Carousel.vue';
 import FormContainerComp from '@/components/FormContainer.vue';
-import FormTextInputComp from '@/components/TextInput.vue';
+import SelectInput from '@/components/SelectInput.vue';
+import TextInput from '@/components/TextInput.vue';
 import QrScanner from 'qr-scanner';
-import QRCode from 'qrcode';
+import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode';
 import { reactive, ref } from 'vue';
 
 const qrCode = ref<HTMLCanvasElement>(),
-	input = reactive({
+	qrLevel = ref<Map<string, QRCodeErrorCorrectionLevel>>(new Map()),
+	input = reactive<{
+		errorLevel: QRCodeErrorCorrectionLevel;
+		name: '';
+		email: '';
+		phone: '';
+		address: '';
+		url: '';
+		logoRatio: 1;
+	}>({
 		name: '',
 		email: '',
 		phone: '',
 		address: '',
 		url: '',
 		logoRatio: 1,
+		errorLevel: 'L',
 	}),
 	logoReader = new FileReader(),
 	logoDraw = ref<Function>(),
@@ -122,7 +131,11 @@ END:VCARD
 		}
 
 		const { qrContact: value } = generateVCard(),
-			qrOptions: QRCode.QRCodeToDataURLOptions = { margin: 5, width: 4096 };
+			qrOptions: QRCode.QRCodeToDataURLOptions = {
+				margin: 5,
+				width: 4096,
+				errorCorrectionLevel: input.errorLevel,
+			};
 
 		QRCode.toCanvas(qrCode.value, value, qrOptions);
 
@@ -175,4 +188,8 @@ function handleFileChange(event: Event) {
 		logoDraw.value = () => logoReader.readAsDataURL(file);
 	}
 }
+
+qrLevel.value.set('Cao', 'high');
+qrLevel.value.set('Trung bình', 'medium');
+qrLevel.value.set('Thấp', 'low');
 </script>
