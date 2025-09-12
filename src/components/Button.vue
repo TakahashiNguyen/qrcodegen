@@ -7,13 +7,20 @@
 			:type
 			class="w-full rounded-lg px-5 py-2.5 text-center text-sm font-medium"
 			:class="{
-				'text--primary bg--primary hover:text--secondary hover:bg--secondary':
+				'text--primary bg--primary hover:text--secondary hover:bg--secondary disabled:bg--secondary disabled:text--secondary':
 					theme == 'primary',
 				'text--tertiary hover:bg--tertiary hover:-text--2':
 					theme == 'secondary',
 			}"
+			:disabled="isLoading"
 		>
-			<slot />
+			<slot v-if="!isLoading" />
+			<div
+				class="inset-y-0 start-0 flex items-center justify-center-safe"
+				v-if="isLoading"
+			>
+				<Icon name="progress_activity" class="animate-spin" />
+			</div>
 		</button>
 		<a
 			class="link"
@@ -27,7 +34,11 @@
 </template>
 
 <script setup lang="ts">
-import { type PropType, type VNodeRef } from 'vue';
+import { type PropType, type VNodeRef, ref } from 'vue';
+
+import Icon from './Icon.vue';
+
+const isLoading = ref<boolean>(false);
 
 defineProps({
 	type: {
@@ -46,5 +57,9 @@ defineProps({
 		type: String,
 		required: false,
 	},
+});
+
+defineExpose({
+	toggleLoading: () => (isLoading.value = !isLoading.value),
 });
 </script>

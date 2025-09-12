@@ -20,7 +20,11 @@
 					>
 						Trở về
 					</Button>
-					<Button :class="{ hidden: isEnd }" :onclick="handleButton">
+					<Button
+						ref="submitButton"
+						:class="{ hidden: isEnd }"
+						:onclick="handleButton"
+					>
 						Hoàn tất
 					</Button>
 					<Button :class="{ hidden: isStart }" :onclick="qrDownload">
@@ -35,14 +39,22 @@
 					<TextInput name="Địa chỉ thư điện tử" v-model="input.email" />
 					<TextInput name="Số phòng" v-model="input.address" />
 					<TextInput name="Link url fanpage" v-model="input.url" />
-					<SelectInput name="Cấp độ (càng cao càng chi tiết; mặc định: thấp)" :list="qrLevel" v-model="input.errorLevel" />
+					<SelectInput
+						name="Cấp độ (càng cao càng chi tiết; mặc định: thấp)"
+						:list="qrLevel"
+						v-model="input.errorLevel"
+					/>
 					<TextInput
 						type="file"
 						@change="handleFileChange"
 						accept="image/*"
 						name="Ảnh logo"
 					/>
-					<TextInput v-if="logoDraw" name="Tỉ lệ logo so với gốc" v-model="input.logoRatio" />
+					<TextInput
+						v-if="logoDraw"
+						name="Tỉ lệ logo so với gốc"
+						v-model="input.logoRatio"
+					/>
 					<div v-if="error">
 						<a class="text-error">{{ error }}</a>
 					</div>
@@ -88,6 +100,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 	logoReader = new FileReader(),
 	logoDraw = ref<Function>(),
 	carousel = ref<typeof Carousel>(),
+	submitButton = ref<typeof Button>(),
 	error = ref(''),
 	qrDownload = async () => {
 		qrCode.value!.toBlob((blob) => {
@@ -105,6 +118,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 	},
 	handleButton = async () => {
 		error.value = '';
+		submitButton.value?.toggleLoading();
 
 		function generateVCard() {
 			const { name, phone, email, address, url } = input,
@@ -152,6 +166,8 @@ END:VCARD
 		} catch {
 			error.value = 'Logo quá lớn, không thể nhận dạng.';
 		}
+
+		submitButton.value?.toggleLoading();
 	};
 
 logoReader.onload = (e) => {
