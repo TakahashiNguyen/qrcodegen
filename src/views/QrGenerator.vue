@@ -13,14 +13,14 @@
 				<div
 					class="right-0 -bottom-15 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
 				>
-					<!-- <Button
+					<Button
 						theme="secondary"
-						:class="{ hidden: logoDraw == null }"
+						:class="{ hidden: logoDraw == null || isEnd }"
 						:onclick="autoAlignLogo"
 						ref="autoAlignLogoButton"
 					>
 						Tự động căn chỉnh logo
-					</Button> -->
+					</Button>
 					<Button
 						:button-ref="previous"
 						theme="secondary"
@@ -88,6 +88,7 @@ import { reactive, ref } from 'vue';
 
 const qrCode = ref<HTMLCanvasElement>(),
 	qrLevel = ref<Map<string, QRCodeErrorCorrectionLevel>>(new Map()),
+	qrWidth = 4096,
 	input = reactive<{
 		errorLevel: QRCodeErrorCorrectionLevel;
 		name: '';
@@ -107,6 +108,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 	}),
 	logoReader = new FileReader(),
 	logoDraw = ref<Function>(),
+	logoSize = ref<{ width: number; height: number }>(),
 	carousel = ref<typeof Carousel>(),
 	submitButton = ref<typeof Button>(),
 	autoAlignLogoButton = ref<typeof Button>(),
@@ -129,18 +131,20 @@ const qrCode = ref<HTMLCanvasElement>(),
 		autoAlignLogoButton.value?.toggleLoading();
 
 		const checker = (ratio: number): Promise<boolean> => {
-			input.logoRatio = ratio;
+				input.logoRatio = ratio;
 
-			return handleButton(true);
-		};
+				return handleButton(true);
+			},
+			percentage = 10,
+			{ width: logoWidth, height: logoHeight } = logoSize.value!;
 
 		let lower = 0,
-			upper = 40000;
+			upper = Math.ceil(qrWidth / Math.max(logoWidth, logoHeight)) * percentage;
 
 		while (lower <= upper) {
 			const mid = Math.floor((lower + upper) / 2);
 
-			if (!(await checker(mid / 100))) upper = mid - 1;
+			if (!(await checker(mid / percentage))) upper = mid - 1;
 			else lower = mid + 1;
 		}
 
@@ -181,7 +185,7 @@ END:VCARD
 		const { qrContact: value } = generateVCard(),
 			qrOptions: QRCode.QRCodeToDataURLOptions = {
 				margin: 5,
-				width: 4096,
+				width: qrWidth,
 				errorCorrectionLevel: input.errorLevel,
 			};
 
@@ -235,14 +239,38 @@ logoReader.onload = (e) => {
 	img.src = e.target?.result as string;
 };
 
-function handleFileChange(event: Event) {
+async function handleFileChange(event: Event) {
 	const input = event.target as HTMLInputElement;
 
 	if (input.files && input.files[0]) {
 		const file = input.files[0];
 
+		logoSize.value = await getImageDimensions(file);
+
 		logoDraw.value = () => logoReader.readAsDataURL(file);
 	}
+}
+
+function getImageDimensions(
+	file: File,
+): Promise<{ width: number; height: number }> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			const img = new Image();
+			img.onload = () => {
+				resolve({ width: img.width, height: img.height });
+			};
+			img.onerror = () => {
+				reject(new Error('Unable to load image.'));
+			};
+			img.src = reader.result as string;
+		};
+		reader.onerror = () => {
+			reject(new Error('Error reading file.'));
+		};
+		reader.readAsDataURL(file);
+	});
 }
 
 qrLevel.value.set('Cao', 'high');

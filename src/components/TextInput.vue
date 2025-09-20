@@ -28,7 +28,7 @@
 					:onchange
 				/>
 				<span
-					class="border--primary text--0 h-10 w-full rounded-l-lg border border-r-0 p-2"
+					class="border--primary text--0 h-10 w-full rounded-l-lg border border-r-0 p-2 overflow-hidden"
 					v-if="type == 'file'"
 				>
 					{{ fileName }}
