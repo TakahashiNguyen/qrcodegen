@@ -13,6 +13,14 @@
 				<div
 					class="right-0 -bottom-15 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
 				>
+					<!-- <Button
+						theme="secondary"
+						:class="{ hidden: logoDraw == null }"
+						:onclick="autoAlignLogo"
+						ref="autoAlignLogoButton"
+					>
+						Tự động căn chỉnh logo
+					</Button> -->
 					<Button
 						:button-ref="previous"
 						theme="secondary"
@@ -87,7 +95,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 		phone: '';
 		address: '';
 		url: '';
-		logoRatio: 1;
+		logoRatio: number;
 	}>({
 		name: '',
 		email: '',
@@ -101,6 +109,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 	logoDraw = ref<Function>(),
 	carousel = ref<typeof Carousel>(),
 	submitButton = ref<typeof Button>(),
+	autoAlignLogoButton = ref<typeof Button>(),
 	error = ref(''),
 	qrDownload = async () => {
 		qrCode.value!.toBlob((blob) => {
@@ -116,9 +125,34 @@ const qrCode = ref<HTMLCanvasElement>(),
 			URL.revokeObjectURL(url);
 		}, 'image/png');
 	},
-	handleButton = async () => {
+	autoAlignLogo = async () => {
+		autoAlignLogoButton.value?.toggleLoading();
+
+		const checker = (ratio: number): Promise<boolean> => {
+			input.logoRatio = ratio;
+
+			return handleButton(true);
+		};
+
+		let lower = 0,
+			upper = 40000;
+
+		while (lower <= upper) {
+			const mid = Math.floor((lower + upper) / 2);
+
+			if (!(await checker(mid / 100))) upper = mid - 1;
+			else lower = mid + 1;
+		}
+
+		carousel.value?.next();
+		autoAlignLogoButton.value?.toggleLoading();
+	},
+	handleButton = async (isAutoAlignLogo: boolean = false) => {
 		error.value = '';
-		submitButton.value?.toggleLoading();
+
+		if (typeof isAutoAlignLogo != 'boolean') isAutoAlignLogo = false;
+
+		if (!isAutoAlignLogo) submitButton.value?.toggleLoading();
 
 		function generateVCard() {
 			const { name, phone, email, address, url } = input,
@@ -158,16 +192,22 @@ END:VCARD
 		await sleep(10);
 
 		try {
-			const decoded = await QrScanner.scanImage(qrCode.value!);
+			const decoded = await QrScanner.scanImage(qrCode.value!, {});
 
-			if (decoded !== value) throw new Error();
+			if ((decoded as unknown as string) !== value) throw new Error();
+
+			if (isAutoAlignLogo) return true;
 
 			carousel.value?.next();
 		} catch {
+			if (isAutoAlignLogo) return false;
+
 			error.value = 'Logo quá lớn, không thể nhận dạng.';
 		}
 
 		submitButton.value?.toggleLoading();
+
+		return false;
 	};
 
 logoReader.onload = (e) => {
