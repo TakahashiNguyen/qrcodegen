@@ -227,5 +227,6 @@ onMounted(async () => {
 defineExpose({
 	next: () => carousel.value?.next(),
 	previous: () => carousel.value?.prev(),
+	toggleLoading: () => loadingDiv.value?.toggleHidden()
 });
 </script>

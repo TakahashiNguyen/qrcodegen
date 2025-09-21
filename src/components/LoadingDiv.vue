@@ -1,9 +1,8 @@
 <template>
-	<div
-		class="h-full w-full bg-white dark:bg-black"
-		:class="{ hidden: isHidden }"
-	>
-		<div class="h-full w-full animate-pulse bg-black/10 dark:bg-white/10"></div>
+	<div class="z-50 h-full w-full" :class="{ hidden: isHidden }">
+		<div
+			class="bg-dark-0/10 dark:bg-light-0/10 h-full w-full animate-pulse rounded-lg"
+		></div>
 	</div>
 </template>
 

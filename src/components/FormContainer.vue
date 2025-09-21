@@ -7,9 +7,9 @@
 				class="desktop:flex-row desktop:justify-between flex size-full flex-col justify-center-safe space-y-6"
 				@submit.prevent="buttonHandler"
 			>
-				<h5 class="text-3xl font-medium" v-if="title">
+				<a class="text-3xl font-medium" v-if="title">
 					{{ title }}
-				</h5>
+				</a>
 				<div class="desktop:w-md w-full space-y-6">
 					<slot />
 				</div>

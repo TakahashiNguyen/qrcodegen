@@ -15,11 +15,18 @@
 				>
 					<Button
 						theme="secondary"
+						v-if="isAutoAlignLogo"
+						:onclick="toggleAutoAlignLogo"
+					>
+						Quay lại
+					</Button>
+					<Button
+						:theme="isAutoAlignLogo ? 'primary' : 'secondary'"
 						:class="{ hidden: drawLogo == null || isEnd }"
 						:onclick="autoAlignLogo"
 						ref="autoAlignLogoButton"
 					>
-						Tự động căn chỉnh logo
+						{{ isAutoAlignLogo ? 'Xác nhận' : 'Tự động căn chỉnh logo' }}
 					</Button>
 					<Button
 						:button-ref="previous"
@@ -29,6 +36,7 @@
 						Trở về
 					</Button>
 					<Button
+						v-if="!isAutoAlignLogo"
 						ref="submitButton"
 						:class="{ hidden: isEnd }"
 						:onclick="handleButton"
@@ -59,15 +67,27 @@
 						name="Ảnh logo"
 					/>
 					<TextInput
-						v-if="drawLogo"
+						type="number"
+						v-if="drawLogo && !isAutoAlignLogo"
 						name="Tỉ lệ logo so với gốc"
 						v-model="input.logoScale"
 					/>
 					<TextInput
-						v-if="drawLogo"
+						type="number"
+						v-if="drawLogo && !isAutoAlignLogo"
 						name="Độ lớn góc xoay mã QR"
 						v-model="input.logoRotation"
-						default-value="0"
+					/>
+					<TextInput
+						type="number"
+						name="Độ lớn viền trắng"
+						v-model="input.qrMargin"
+					/>
+					<TextInput
+						type="number"
+						v-if="isAutoAlignLogo"
+						name="Độ lớn bước góc xoay mã QR"
+						v-model="input.rotationStep"
 					/>
 					<div v-if="errorMessage">
 						<a class="text-error">{{ errorMessage }}</a>
@@ -82,6 +102,7 @@
 </template>
 
 <script setup lang="ts">
+import { sleep } from '@/app/functions';
 import Button from '@/components/Button.vue';
 import Carousel from '@/components/Carousel.vue';
 import FormContainerComp from '@/components/FormContainer.vue';
@@ -105,6 +126,8 @@ const qrCode = ref<HTMLCanvasElement>(),
 		pageLink: string;
 		logoScale: number;
 		logoRotation: number;
+		qrMargin: number;
+		rotationStep: number;
 	}>({
 		name: 'Phòng Công tác học sinh - sinh viên',
 		email: 'phongctct-hssv@tdtu.edu.vn',
@@ -114,12 +137,15 @@ const qrCode = ref<HTMLCanvasElement>(),
 		logoScale: 1,
 		errorCorrectionLevel: 'L',
 		logoRotation: 0,
+		qrMargin: 5,
+		rotationStep: 90,
 	}),
 	drawLogo = ref<Function>(),
 	logoSize = ref<{ width: number; height: number }>(),
-	carousel = ref<typeof Carousel>(),
-	submitButton = ref<typeof Button>(),
-	autoAlignLogoButton = ref<typeof Button>(),
+	carousel = ref<InstanceType<typeof Carousel>>(),
+	submitButton = ref<InstanceType<typeof Button>>(),
+	autoAlignLogoButton = ref<InstanceType<typeof Button>>(),
+	isAutoAlignLogo = ref(false),
 	errorMessage = ref(''),
 	qrDownload = async () => {
 		qrCode.value!.toBlob((blob) => {
@@ -135,8 +161,26 @@ const qrCode = ref<HTMLCanvasElement>(),
 			URL.revokeObjectURL(pageLink);
 		}, 'image/png');
 	},
+	toggleAutoAlignLogo = () => {
+		isAutoAlignLogo.value = !isAutoAlignLogo.value;
+	},
 	autoAlignLogo = async () => {
+		if (!isAutoAlignLogo.value) {
+			toggleAutoAlignLogo();
+
+			return;
+		}
+
+		toggleAutoAlignLogo();
+
 		autoAlignLogoButton.value?.toggleLoading();
+		carousel.value?.toggleLoading();
+		await sleep(1);
+
+		input.logoRotation = 0;
+
+		let scale = 0,
+			rotate = 0;
 
 		const qrCodeImageData = await drawQrCode(),
 			autoScale = async (): Promise<number> => {
@@ -148,16 +192,18 @@ const qrCode = ref<HTMLCanvasElement>(),
 						return handleButton(true);
 					},
 					precision = 1,
-					multiplier = Math.pow(10, precision),
+					base = 10,
+					multiplier = Math.pow(base, precision),
 					{ width: logoWidth, height: logoHeight } = logoSize.value!;
 
 				let lower = 0,
 					upper = Math.floor(
-						((1.0 * qrCodeWidth) / Math.max(logoWidth, logoHeight)) *
+						((1.0 * qrCodeWidth) /
+							Math.sqrt(logoWidth * logoWidth + logoHeight * logoHeight)) *
 							multiplier,
 					);
 
-				while (lower <= upper) {
+				while (lower <= upper && upper / multiplier > scale) {
 					const mid = Math.floor((lower + upper) / 2);
 
 					if (!(await checker(mid / multiplier))) upper = mid - 1;
@@ -166,13 +212,8 @@ const qrCode = ref<HTMLCanvasElement>(),
 
 				return Math.floor((lower + upper) / 2) / multiplier;
 			},
-			autoRotate = async (): Promise<{ scale: number; rotate: number }> => {
-				input.logoRotation = 0;
-
-				let scale = await autoScale(),
-					rotate = 0;
-
-				for (let i = 90; i < 360; i += 90) {
+			autoRotate = async () => {
+				for (let i = input.rotationStep; i <= 360; i += input.rotationStep) {
 					input.logoRotation = i;
 
 					const currentScale = await autoScale();
@@ -182,11 +223,9 @@ const qrCode = ref<HTMLCanvasElement>(),
 						scale = currentScale;
 					}
 				}
-
-				return { scale, rotate };
 			};
 
-		const { scale, rotate } = await autoRotate();
+		await autoRotate();
 
 		input.logoScale = scale;
 		input.logoRotation = rotate;
@@ -194,6 +233,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 		qrCodeCanvasCtx.value!.putImageData(qrCodeImageData, 0, 0);
 		await handleButton(false);
 
+		carousel.value?.toggleLoading();
 		autoAlignLogoButton.value?.toggleLoading();
 	},
 	drawQrCode = async (): Promise<ImageData> => {
@@ -223,7 +263,7 @@ END:VCARD
 
 		const { qrContact: value } = generateVCard(),
 			qrOptions: QRCode.QRCodeToDataURLOptions = {
-				margin: 5,
+				margin: input.qrMargin,
 				width: qrCodeWidth,
 				errorCorrectionLevel: input.errorCorrectionLevel,
 			};
@@ -245,6 +285,8 @@ END:VCARD
 
 		if (!isAutoAlignLogo) {
 			submitButton.value?.toggleLoading();
+			carousel.value?.toggleLoading();
+			await sleep(1);
 			await drawQrCode();
 		}
 
@@ -272,6 +314,7 @@ END:VCARD
 		}
 
 		submitButton.value?.toggleLoading();
+		carousel.value?.toggleLoading();
 
 		return false;
 	};
