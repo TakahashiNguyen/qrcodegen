@@ -15,7 +15,7 @@
 				>
 					<Button
 						theme="secondary"
-						:class="{ hidden: logoDraw == null || isEnd }"
+						:class="{ hidden: drawLogo == null || isEnd }"
 						:onclick="autoAlignLogo"
 						ref="autoAlignLogoButton"
 					>
@@ -45,12 +45,12 @@
 					<TextInput name="Họ và tên" v-model="input.name" />
 					<TextInput name="Số điện thoại" v-model="input.phone" />
 					<TextInput name="Địa chỉ thư điện tử" v-model="input.email" />
-					<TextInput name="Số phòng" v-model="input.address" />
-					<TextInput name="Link url fanpage" v-model="input.url" />
+					<TextInput name="Số phòng" v-model="input.roomNumber" />
+					<TextInput name="Link pageLink fanpage" v-model="input.pageLink" />
 					<SelectInput
 						name="Cấp độ (càng cao, mã QR càng chi tiết)"
-						:list="qrLevel"
-						v-model="input.errorLevel"
+						:list="qrCodeLevels"
+						v-model="input.errorCorrectionLevel"
 					/>
 					<TextInput
 						type="file"
@@ -59,18 +59,18 @@
 						name="Ảnh logo"
 					/>
 					<TextInput
-						v-if="logoDraw"
+						v-if="drawLogo"
 						name="Tỉ lệ logo so với gốc"
-						v-model="input.logoRatio"
+						v-model="input.logoScale"
 					/>
 					<TextInput
-						v-if="logoDraw"
+						v-if="drawLogo"
 						name="Độ lớn góc xoay mã QR"
-						v-model="input.logoRotate"
+						v-model="input.logoRotation"
 						default-value="0"
 					/>
-					<div v-if="error">
-						<a class="text-error">{{ error }}</a>
+					<div v-if="errorMessage">
+						<a class="text-error">{{ errorMessage }}</a>
 					</div>
 				</div>
 				<div class="aspect-square w-full">
@@ -92,80 +92,113 @@ import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode';
 import { reactive, ref } from 'vue';
 
 const qrCode = ref<HTMLCanvasElement>(),
-	qrLevel = ref<Map<string, QRCodeErrorCorrectionLevel>>(new Map()),
-	qrWidth = 4096,
+	qrCodeLevels = ref<Map<string, QRCodeErrorCorrectionLevel>>(new Map()),
+	qrCodeWidth = 4096,
+	qrCodeContent = ref<string>(''),
+	qrCodeCanvasCtx = ref<CanvasRenderingContext2D>(),
 	input = reactive<{
-		errorLevel: QRCodeErrorCorrectionLevel;
+		errorCorrectionLevel: QRCodeErrorCorrectionLevel;
 		name: string;
 		email: string;
 		phone: string;
-		address: string;
-		url: string;
-		logoRatio: number;
-		logoRotate: number;
+		roomNumber: string;
+		pageLink: string;
+		logoScale: number;
+		logoRotation: number;
 	}>({
 		name: 'Phòng Công tác học sinh - sinh viên',
 		email: 'phongctct-hssv@tdtu.edu.vn',
 		phone: '02837755054',
-		address: 'A0003',
-		url: 'fb.com/pcthssv.tdtu',
-		logoRatio: 1,
-		errorLevel: 'L',
-		logoRotate: 0,
+		roomNumber: 'A0003',
+		pageLink: 'fb.com/pcthssv.tdtu',
+		logoScale: 1,
+		errorCorrectionLevel: 'L',
+		logoRotation: 0,
 	}),
-	logoDraw = ref<Function>(),
+	drawLogo = ref<Function>(),
 	logoSize = ref<{ width: number; height: number }>(),
 	carousel = ref<typeof Carousel>(),
 	submitButton = ref<typeof Button>(),
 	autoAlignLogoButton = ref<typeof Button>(),
-	error = ref(''),
+	errorMessage = ref(''),
 	qrDownload = async () => {
 		qrCode.value!.toBlob((blob) => {
 			if (!blob) return;
 
-			const url = URL.createObjectURL(blob),
+			const pageLink = URL.createObjectURL(blob),
 				a = document.createElement('a');
-			a.href = url;
+			a.href = pageLink;
 			a.download = input.name + '.png';
 			document.body.appendChild(a);
 			a.click();
 			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
+			URL.revokeObjectURL(pageLink);
 		}, 'image/png');
 	},
 	autoAlignLogo = async () => {
 		autoAlignLogoButton.value?.toggleLoading();
 
-		const checker = (ratio: number): Promise<boolean> => {
-				input.logoRatio = ratio;
+		const qrCodeImageData = await drawQrCode(),
+			autoScale = async (): Promise<number> => {
+				const checker = (ratio: number): Promise<boolean> => {
+						input.logoScale = ratio;
 
-				return handleButton(true);
+						qrCodeCanvasCtx.value!.putImageData(qrCodeImageData, 0, 0);
+
+						return handleButton(true);
+					},
+					precision = 1,
+					multiplier = Math.pow(10, precision),
+					{ width: logoWidth, height: logoHeight } = logoSize.value!;
+
+				let lower = 0,
+					upper = Math.floor(
+						((1.0 * qrCodeWidth) / Math.max(logoWidth, logoHeight)) *
+							multiplier,
+					);
+
+				while (lower <= upper) {
+					const mid = Math.floor((lower + upper) / 2);
+
+					if (!(await checker(mid / multiplier))) upper = mid - 1;
+					else lower = mid + 1;
+				}
+
+				return Math.floor((lower + upper) / 2) / multiplier;
 			},
-			percentage = 10,
-			{ width: logoWidth, height: logoHeight } = logoSize.value!;
+			autoRotate = async (): Promise<{ scale: number; rotate: number }> => {
+				input.logoRotation = 0;
 
-		let lower = 0,
-			upper = Math.ceil(qrWidth / Math.max(logoWidth, logoHeight)) * percentage;
+				let scale = await autoScale(),
+					rotate = 0;
 
-		while (lower <= upper) {
-			const mid = Math.floor((lower + upper) / 2);
+				for (let i = 90; i < 360; i += 90) {
+					input.logoRotation = i;
 
-			if (!(await checker(mid / percentage))) upper = mid - 1;
-			else lower = mid + 1;
-		}
+					const currentScale = await autoScale();
 
-		carousel.value?.next();
+					if (currentScale > scale) {
+						rotate = i;
+						scale = currentScale;
+					}
+				}
+
+				return { scale, rotate };
+			};
+
+		const { scale, rotate } = await autoRotate();
+
+		input.logoScale = scale;
+		input.logoRotation = rotate;
+
+		qrCodeCanvasCtx.value!.putImageData(qrCodeImageData, 0, 0);
+		await handleButton(false);
+
 		autoAlignLogoButton.value?.toggleLoading();
 	},
-	handleButton = async (isAutoAlignLogo: boolean = false) => {
-		error.value = '';
-
-		if (typeof isAutoAlignLogo != 'boolean') isAutoAlignLogo = false;
-
-		if (!isAutoAlignLogo) submitButton.value?.toggleLoading();
-
+	drawQrCode = async (): Promise<ImageData> => {
 		function generateVCard() {
-			const { name, phone, email, address, url } = input,
+			const { name, phone, email, roomNumber, pageLink } = input,
 				lastName = name,
 				firstName = '',
 				middleName = '',
@@ -180,8 +213,8 @@ N:${nField}
 FN:${fnField}
 TEL;TYPE=cell:${phone}
 EMAIL;INTERNET;PREF:${email}
-ADR;TYPE=WORK;PREF=1;LABEL="":;Trường Đại học Tôn Đức Thắng;Phòng ${address};phường Tân Phong;19 Nguyễn Hữu Thọ;Thành phố Hồ Chí Minh;Việt Nam
-URL:${url}
+ADR;TYPE=WORK;PREF=1;LABEL="":;Trường Đại học Tôn Đức Thắng;Phòng ${roomNumber};phường Tân Phong;19 Nguyễn Hữu Thọ;Thành phố Hồ Chí Minh;Việt Nam
+URL:${pageLink}
 END:VCARD
   `.trim(),
 				qrPhone: `MECARD:TEL:${phone};;`,
@@ -191,31 +224,51 @@ END:VCARD
 		const { qrContact: value } = generateVCard(),
 			qrOptions: QRCode.QRCodeToDataURLOptions = {
 				margin: 5,
-				width: qrWidth,
-				errorCorrectionLevel: input.errorLevel,
+				width: qrCodeWidth,
+				errorCorrectionLevel: input.errorCorrectionLevel,
 			};
 
-		QRCode.toCanvas(qrCode.value, value, qrOptions);
+		qrCodeContent.value = value;
 
-		await logoDraw.value?.();
+		await QRCode.toCanvas(qrCode.value, value, qrOptions);
+
+		qrCodeCanvasCtx.value = qrCode.value!.getContext('2d', {
+			willReadFrequently: true,
+		})!;
+
+		return qrCodeCanvasCtx.value!.getImageData(0, 0, qrCodeWidth, qrCodeWidth)!;
+	},
+	handleButton = async (isAutoAlignLogo: boolean = false) => {
+		errorMessage.value = '';
+
+		if (typeof isAutoAlignLogo != 'boolean') isAutoAlignLogo = false;
+
+		if (!isAutoAlignLogo) {
+			submitButton.value?.toggleLoading();
+			await drawQrCode();
+		}
+
+		await drawLogo.value?.();
 
 		try {
-			const ctx = qrCode.value!.getContext('2d', { willReadFrequently: true }),
-				{ data: decoded } = jsQR(
-					ctx!.getImageData(0, 0, qrWidth, qrWidth)!.data,
-					qrWidth,
-					qrWidth,
-				)!;
+			const { data: decoded } = jsQR(
+				qrCodeCanvasCtx.value!.getImageData(0, 0, qrCodeWidth, qrCodeWidth)!
+					.data,
+				qrCodeWidth,
+				qrCodeWidth,
+			)!;
 
-			if (decoded !== value) throw new Error();
+			if (decoded !== qrCodeContent.value) throw new Error();
 
 			if (isAutoAlignLogo) return true;
+
+			qrCode.value!.style.rotate = `-${input.logoRotation}deg`;
 
 			carousel.value?.next();
 		} catch (e) {
 			if (isAutoAlignLogo) return false;
 
-			error.value = 'Logo quá lớn, không thể nhận dạng.';
+			errorMessage.value = 'Logo quá lớn, không thể nhận dạng.';
 		}
 
 		submitButton.value?.toggleLoading();
@@ -231,8 +284,8 @@ async function handleFileChange(event: Event) {
 
 		logoSize.value = await getImageDimensions(file);
 
-		logoDraw.value = async () =>
-			new Promise((resolve) => {
+		drawLogo.value = async () =>
+			new Promise<void>((resolve, reject) => {
 				const logoReader = new FileReader();
 
 				logoReader.onload = (e) => {
@@ -240,19 +293,17 @@ async function handleFileChange(event: Event) {
 
 					img.onload = () => {
 						if (qrCode.value) {
-							const ctx = qrCode.value.getContext('2d', {
-									willReadFrequently: true,
-								}),
+							const ctx = qrCodeCanvasCtx.value,
 								ele = qrCode.value,
-								imgWidth = img.width * input.logoRatio,
-								imgHeight = img.height * input.logoRatio;
+								imgWidth = img.width * input.logoScale,
+								imgHeight = img.height * input.logoScale;
 
 							if (ctx) {
 								ctx.save();
 
 								ctx.translate(ele.width / 2, ele.height / 2);
 
-								ctx.rotate((input.logoRotate / 180) * Math.PI);
+								ctx.rotate((input.logoRotation / 180) * Math.PI);
 
 								ctx.drawImage(
 									img,
@@ -263,10 +314,14 @@ async function handleFileChange(event: Event) {
 								);
 
 								ctx.restore();
+
+								resolve();
 							}
+
+							reject('Canvas not found');
 						}
 
-						resolve(null);
+						reject('Invalid QR content');
 					};
 
 					img.src = e.target?.result as string;
@@ -274,7 +329,7 @@ async function handleFileChange(event: Event) {
 
 				logoReader.readAsDataURL(file);
 			});
-	} else logoDraw.value = undefined;
+	} else drawLogo.value = undefined;
 }
 
 function getImageDimensions(
@@ -299,7 +354,7 @@ function getImageDimensions(
 	});
 }
 
-qrLevel.value.set('Cao', 'H');
-qrLevel.value.set('Trung bình', 'M');
-qrLevel.value.set('Thấp', 'L');
+qrCodeLevels.value.set('Cao', 'H');
+qrCodeLevels.value.set('Trung bình', 'M');
+qrCodeLevels.value.set('Thấp', 'L');
 </script>
