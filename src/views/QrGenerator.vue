@@ -24,7 +24,7 @@
 						:theme="isAutoAlignLogo ? 'primary' : 'secondary'"
 						:class="{ hidden: drawLogo == null || isEnd }"
 						:onclick="autoAlignLogo"
-						ref="autoAlignLogoButton"
+						v-if="!isProcessing"
 					>
 						{{ isAutoAlignLogo ? 'Xác nhận' : 'Tự động căn chỉnh logo' }}
 					</Button>
@@ -41,7 +41,7 @@
 						:class="{ hidden: isEnd }"
 						:onclick="handleButton"
 					>
-						Hoàn tất
+						Xác nhận
 					</Button>
 					<Button :class="{ hidden: isStart }" :onclick="qrDownload">
 						Tải ảnh
@@ -54,11 +54,16 @@
 					<TextInput name="Số điện thoại" v-model="input.phone" />
 					<TextInput name="Địa chỉ thư điện tử" v-model="input.email" />
 					<TextInput name="Số phòng" v-model="input.roomNumber" />
-					<TextInput name="Link pageLink fanpage" v-model="input.pageLink" />
+					<TextInput name="Link fanpage" v-model="input.pageLink" />
 					<SelectInput
 						name="Cấp độ (càng cao, mã QR càng chi tiết)"
 						:list="qrCodeLevels"
 						v-model="input.errorCorrectionLevel"
+					/>
+					<TextInput
+						type="number"
+						name="Độ lớn viền trắng"
+						v-model="input.qrMargin"
 					/>
 					<TextInput
 						type="file"
@@ -77,11 +82,6 @@
 						v-if="drawLogo && !isAutoAlignLogo"
 						name="Độ lớn góc xoay mã QR"
 						v-model="input.logoRotation"
-					/>
-					<TextInput
-						type="number"
-						name="Độ lớn viền trắng"
-						v-model="input.qrMargin"
 					/>
 					<TextInput
 						type="number"
@@ -137,15 +137,15 @@ const qrCode = ref<HTMLCanvasElement>(),
 		logoScale: 1,
 		errorCorrectionLevel: 'L',
 		logoRotation: 0,
-		qrMargin: 5,
+		qrMargin: 20,
 		rotationStep: 90,
 	}),
 	drawLogo = ref<Function>(),
 	logoSize = ref<{ width: number; height: number }>(),
 	carousel = ref<InstanceType<typeof Carousel>>(),
 	submitButton = ref<InstanceType<typeof Button>>(),
-	autoAlignLogoButton = ref<InstanceType<typeof Button>>(),
 	isAutoAlignLogo = ref(false),
+	isProcessing = ref(false),
 	errorMessage = ref(''),
 	qrDownload = async () => {
 		qrCode.value!.toBlob((blob) => {
@@ -172,10 +172,10 @@ const qrCode = ref<HTMLCanvasElement>(),
 		}
 
 		toggleAutoAlignLogo();
-
-		autoAlignLogoButton.value?.toggleLoading();
-		carousel.value?.toggleLoading();
+		isProcessing.value = !isProcessing.value;
 		await sleep(1);
+		submitButton.value!.toggleLoading();
+		carousel.value!.toggleLoading();
 
 		input.logoRotation = 0;
 
@@ -213,7 +213,7 @@ const qrCode = ref<HTMLCanvasElement>(),
 				return Math.floor((lower + upper) / 2) / multiplier;
 			},
 			autoRotate = async () => {
-				for (let i = input.rotationStep; i <= 360; i += input.rotationStep) {
+				for (let i = 90; i < 450; i += input.rotationStep) {
 					input.logoRotation = i;
 
 					const currentScale = await autoScale();
@@ -231,10 +231,12 @@ const qrCode = ref<HTMLCanvasElement>(),
 		input.logoRotation = rotate;
 
 		qrCodeCanvasCtx.value!.putImageData(qrCodeImageData, 0, 0);
+		isProcessing.value = !isProcessing.value;
+		await sleep(1);
+		submitButton.value!.toggleLoading();
 		await handleButton(false);
 
 		carousel.value?.toggleLoading();
-		autoAlignLogoButton.value?.toggleLoading();
 	},
 	drawQrCode = async (): Promise<ImageData> => {
 		function generateVCard() {
@@ -286,6 +288,7 @@ END:VCARD
 		if (!isAutoAlignLogo) {
 			submitButton.value?.toggleLoading();
 			carousel.value?.toggleLoading();
+			isProcessing.value = !isProcessing.value;
 			await sleep(1);
 			await drawQrCode();
 		}
@@ -304,8 +307,6 @@ END:VCARD
 
 			if (isAutoAlignLogo) return true;
 
-			qrCode.value!.style.rotate = `-${input.logoRotation}deg`;
-
 			carousel.value?.next();
 		} catch (e) {
 			if (isAutoAlignLogo) return false;
@@ -315,6 +316,8 @@ END:VCARD
 
 		submitButton.value?.toggleLoading();
 		carousel.value?.toggleLoading();
+		isProcessing.value = !isProcessing.value;
+		await sleep(1);
 
 		return false;
 	};
@@ -339,14 +342,16 @@ async function handleFileChange(event: Event) {
 							const ctx = qrCodeCanvasCtx.value,
 								ele = qrCode.value,
 								imgWidth = img.width * input.logoScale,
-								imgHeight = img.height * input.logoScale;
+								imgHeight = img.height * input.logoScale,
+								angle = (input.logoRotation / 180) * Math.PI;
 
 							if (ctx) {
+								// Draw logo
 								ctx.save();
 
 								ctx.translate(ele.width / 2, ele.height / 2);
 
-								ctx.rotate((input.logoRotation / 180) * Math.PI);
+								ctx.rotate(angle);
 
 								ctx.drawImage(
 									img,
@@ -356,6 +361,34 @@ async function handleFileChange(event: Event) {
 									imgHeight,
 								);
 
+								ctx.restore();
+
+								// Rotate canvas
+								const imageData = ctx.getImageData(
+									0,
+									0,
+									qrCodeWidth,
+									qrCodeWidth,
+								);
+
+								ctx.save();
+								ctx.fillStyle = '#ffffff';
+								ctx.fillRect(0, 0, qrCodeWidth, qrCodeWidth);
+								ctx.translate(qrCodeWidth / 2, qrCodeWidth / 2);
+								ctx.rotate(-angle);
+
+								const off = document.createElement('canvas');
+								off.width = qrCodeWidth;
+								off.height = qrCodeWidth;
+
+								const offCtx = off.getContext('2d'),
+									maxScale =
+										1 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)));
+								if (offCtx) {
+									offCtx.putImageData(imageData, 0, 0);
+									ctx.scale(maxScale, maxScale);
+									ctx.drawImage(off, -qrCodeWidth / 2, -qrCodeWidth / 2);
+								}
 								ctx.restore();
 
 								resolve();
