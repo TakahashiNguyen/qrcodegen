@@ -8,7 +8,7 @@
 			v-model="model"
 		>
 			<option v-for="i in list" v-bind:key="i[0]" :value="i[1]">
-				{{ i[0].replace('_', ' ') }}
+				{{ i[0] }}
 			</option>
 		</select>
 	</div>

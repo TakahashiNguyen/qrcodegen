@@ -48,7 +48,7 @@
 					<TextInput name="Số phòng" v-model="input.address" />
 					<TextInput name="Link url fanpage" v-model="input.url" />
 					<SelectInput
-						name="Cấp độ (càng cao càng chi tiết; mặc định: thấp)"
+						name="Cấp độ (càng cao, mã QR càng chi tiết)"
 						:list="qrLevel"
 						v-model="input.errorLevel"
 					/>
@@ -63,6 +63,12 @@
 						name="Tỉ lệ logo so với gốc"
 						v-model="input.logoRatio"
 					/>
+					<TextInput
+						v-if="logoDraw"
+						name="Độ lớn góc xoay mã QR"
+						v-model="input.logoRotate"
+						default-value="0"
+					/>
 					<div v-if="error">
 						<a class="text-error">{{ error }}</a>
 					</div>
@@ -76,13 +82,12 @@
 </template>
 
 <script setup lang="ts">
-import { sleep } from '@/app/functions';
 import Button from '@/components/Button.vue';
 import Carousel from '@/components/Carousel.vue';
 import FormContainerComp from '@/components/FormContainer.vue';
 import SelectInput from '@/components/SelectInput.vue';
 import TextInput from '@/components/TextInput.vue';
-import QrScanner from 'qr-scanner';
+import jsQR from 'jsqr';
 import QRCode, { type QRCodeErrorCorrectionLevel } from 'qrcode';
 import { reactive, ref } from 'vue';
 
@@ -91,22 +96,23 @@ const qrCode = ref<HTMLCanvasElement>(),
 	qrWidth = 4096,
 	input = reactive<{
 		errorLevel: QRCodeErrorCorrectionLevel;
-		name: '';
-		email: '';
-		phone: '';
-		address: '';
-		url: '';
+		name: string;
+		email: string;
+		phone: string;
+		address: string;
+		url: string;
 		logoRatio: number;
+		logoRotate: number;
 	}>({
-		name: '',
-		email: '',
-		phone: '',
-		address: '',
-		url: '',
+		name: 'Phòng Công tác học sinh - sinh viên',
+		email: 'phongctct-hssv@tdtu.edu.vn',
+		phone: '02837755054',
+		address: 'A0003',
+		url: 'fb.com/pcthssv.tdtu',
 		logoRatio: 1,
 		errorLevel: 'L',
+		logoRotate: 0,
 	}),
-	logoReader = new FileReader(),
 	logoDraw = ref<Function>(),
 	logoSize = ref<{ width: number; height: number }>(),
 	carousel = ref<typeof Carousel>(),
@@ -191,19 +197,22 @@ END:VCARD
 
 		QRCode.toCanvas(qrCode.value, value, qrOptions);
 
-		logoDraw.value?.();
-
-		await sleep(10);
+		await logoDraw.value?.();
 
 		try {
-			const decoded = await QrScanner.scanImage(qrCode.value!, {});
+			const ctx = qrCode.value!.getContext('2d', { willReadFrequently: true }),
+				{ data: decoded } = jsQR(
+					ctx!.getImageData(0, 0, qrWidth, qrWidth)!.data,
+					qrWidth,
+					qrWidth,
+				)!;
 
-			if ((decoded as unknown as string) !== value) throw new Error();
+			if (decoded !== value) throw new Error();
 
 			if (isAutoAlignLogo) return true;
 
 			carousel.value?.next();
-		} catch {
+		} catch (e) {
 			if (isAutoAlignLogo) return false;
 
 			error.value = 'Logo quá lớn, không thể nhận dạng.';
@@ -214,41 +223,58 @@ END:VCARD
 		return false;
 	};
 
-logoReader.onload = (e) => {
-	const img = new Image();
-
-	img.onload = () => {
-		if (qrCode.value) {
-			const ctx = qrCode.value.getContext('2d'),
-				ele = qrCode.value,
-				imgWidth = img.width * input.logoRatio,
-				imgHeight = img.height * input.logoRatio;
-
-			if (ctx) {
-				ctx.drawImage(
-					img,
-					(ele.width - imgWidth) / 2,
-					(ele.height - imgHeight) / 2,
-					imgWidth,
-					imgHeight,
-				);
-			}
-		}
-	};
-
-	img.src = e.target?.result as string;
-};
-
 async function handleFileChange(event: Event) {
-	const input = event.target as HTMLInputElement;
+	const element = event.target as HTMLInputElement;
 
-	if (input.files && input.files[0]) {
-		const file = input.files[0];
+	if (element.files && element.files[0]) {
+		const file = element.files[0];
 
 		logoSize.value = await getImageDimensions(file);
 
-		logoDraw.value = () => logoReader.readAsDataURL(file);
-	}
+		logoDraw.value = async () =>
+			new Promise((resolve) => {
+				const logoReader = new FileReader();
+
+				logoReader.onload = (e) => {
+					const img = new Image();
+
+					img.onload = () => {
+						if (qrCode.value) {
+							const ctx = qrCode.value.getContext('2d', {
+									willReadFrequently: true,
+								}),
+								ele = qrCode.value,
+								imgWidth = img.width * input.logoRatio,
+								imgHeight = img.height * input.logoRatio;
+
+							if (ctx) {
+								ctx.save();
+
+								ctx.translate(ele.width / 2, ele.height / 2);
+
+								ctx.rotate((input.logoRotate / 180) * Math.PI);
+
+								ctx.drawImage(
+									img,
+									-imgWidth / 2,
+									-imgHeight / 2,
+									imgWidth,
+									imgHeight,
+								);
+
+								ctx.restore();
+							}
+						}
+
+						resolve(null);
+					};
+
+					img.src = e.target?.result as string;
+				};
+
+				logoReader.readAsDataURL(file);
+			});
+	} else logoDraw.value = undefined;
 }
 
 function getImageDimensions(
@@ -273,7 +299,7 @@ function getImageDimensions(
 	});
 }
 
-qrLevel.value.set('Cao', 'high');
-qrLevel.value.set('Trung bình', 'medium');
-qrLevel.value.set('Thấp', 'low');
+qrLevel.value.set('Cao', 'H');
+qrLevel.value.set('Trung bình', 'M');
+qrLevel.value.set('Thấp', 'L');
 </script>
