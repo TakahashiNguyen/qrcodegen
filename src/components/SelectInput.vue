@@ -19,6 +19,6 @@ const model = defineModel();
 
 defineProps<{
 	name: string;
-	list: Map<string, string>;
+	list: Map<string, any>;
 }>();
 </script>
