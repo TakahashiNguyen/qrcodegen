@@ -1,5 +1,5 @@
 <template>
-	<div class="z-50 h-full w-full" :class="{ hidden: isHidden }">
+	<div class="z-40 h-full w-full" :class="{ hidden: isHidden }">
 		<div
 			class="bg-dark-0/10 dark:bg-light-0/10 h-full w-full animate-pulse rounded-lg"
 		></div>

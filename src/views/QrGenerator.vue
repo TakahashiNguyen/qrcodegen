@@ -1,17 +1,17 @@
 <template>
 	<FormContainerComp :button-handler="handleButton" title="Tạo QR lưu danh bạ">
 		<Carousel
-			indicators-location="-bottom-15 p-1 hidden"
+			indicators-style="hidden"
 			:indicator="{
 				activeClasses: 'bg-light-primary/90',
 				inactiveClasses: 'bg-light-primary/50 hover:bg-light-primary/70',
 			}"
-			class="mb-20 min-h-30"
+			buttons-style="bottom-0 sticky h-16"
 			ref="carousel"
 		>
 			<template #buttons="{ isEnd, previous, isStart }">
 				<div
-					class="right-0 -bottom-15 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
+					class="right-0 bottom-4 flex h-8 w-fit items-center justify-center [&>*]:ml-2"
 				>
 					<Button
 						theme="secondary"
@@ -49,7 +49,9 @@
 				</div>
 			</template>
 			<template #content>
-				<div class="w-full space-y-6">
+				<div
+					class="desktop:w-md desktop:max-h-[75dvh] tablet:max-h-[65dvh] w-full space-y-6 overflow-y-auto"
+				>
 					<TextInput name="Họ và tên" v-model="input.name" />
 					<TextInput name="Số điện thoại" v-model="input.phone" />
 					<TextInput name="Địa chỉ thư điện tử" v-model="input.email" />

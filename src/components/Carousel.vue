@@ -1,10 +1,11 @@
 <template>
 	<div
 		ref="carouselElement"
+		:class="[containerStyle]"
 		class="relative w-full"
 		:style="{ '--duration': duration + 'ms' }"
 	>
-		<LoadingDiv ref="loadingDiv" class="absolute z-40" />
+		<LoadingDiv ref="loadingDiv" class="absolute left-0 right-0 top-0 z-40" />
 		<!-- Carousel wrapper -->
 		<div
 			ref="carouselWrapper"
@@ -14,9 +15,11 @@
 				<slot name="content" />
 			</DivWrapper>
 		</div>
+	</div>
+	<div :class="[buttonsStyle]" class="bg--0 z-50">
 		<!-- Slider indicators -->
 		<div
-			:class="[indicatorsLocation]"
+			:class="[indicatorsStyle]"
 			class="absolute z-50 flex space-x-3"
 			ref="carouselIndicatorsWrapper"
 		/>
@@ -135,9 +138,17 @@ const carouselElement = ref<HTMLElement>(),
 					'bg-white/50 dark:bg-white/40 hover:bg-white/90 dark:hover:bg-white/70',
 			},
 		},
-		indicatorsLocation: {
+		indicatorsStyle: {
 			type: [String, Object, Array],
-			default: 'bottom-5 left-1/2 -translate-x-1/2',
+			default: 'top-1/2 left-1/2 -translate-1/2',
+		},
+		buttonsStyle: {
+			type: [String, Object, Array],
+			default: 'bottom-0 sticky h-12',
+		},
+		containerStyle: {
+			type: [String, Object, Array],
+			default: '',
 		},
 	});
 
@@ -227,6 +238,6 @@ onMounted(async () => {
 defineExpose({
 	next: () => carousel.value?.next(),
 	previous: () => carousel.value?.prev(),
-	toggleLoading: () => loadingDiv.value?.toggleHidden()
+	toggleLoading: () => loadingDiv.value?.toggleHidden(),
 });
 </script>
