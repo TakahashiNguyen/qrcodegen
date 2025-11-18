@@ -170,7 +170,7 @@ async function qrDownload() {
 		const pageLink = URL.createObjectURL(blob),
 			a = document.createElement('a');
 		a.href = pageLink;
-		a.download = input.name + '.png';
+		a.download = input.link.split('/').slice(-1)[0] + '.png';
 		document.body.appendChild(a);
 		a.click();
 		document.body.removeChild(a);
@@ -294,7 +294,7 @@ async function drawQrCode(
 		const { link } = input;
 
 		return {
-			content: 'http://' + link.trim(),
+			content: 'http://' + link.split('/').slice(-1)[0].trim(),
 		};
 	}
 
