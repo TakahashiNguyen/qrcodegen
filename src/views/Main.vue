@@ -5,6 +5,9 @@
 			<router-link class="link w-fit font-sans" to="/qr-contact"
 				>Tạo mã QR lưu danh bạ</router-link
 			>
+			<router-link class="link w-fit font-sans" to="/link"
+				>Tạo mã QR truy cập đường dẫn (link)</router-link
+			>
 		</div>
 	</div>
 </template>
